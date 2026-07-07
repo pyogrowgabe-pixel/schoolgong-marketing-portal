@@ -1,9 +1,3 @@
-﻿{
-  "version": 2,
-  "cleanUrls": true,
-  "functions": {
-    "api/openai-content.js": {
-      "maxDuration": 60
-    }
-  }
+{
+  "cleanUrls": true
 }
