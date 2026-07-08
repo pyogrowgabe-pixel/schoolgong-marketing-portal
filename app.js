@@ -12,8 +12,18 @@ const seedClients = [
     owner: "OH 쌤",
     period: "2025 운영 현황",
     summary:
-      "OH 쌤의 교육 철학과 실전 수업 가치를 콘텐츠로 정리하고, 노션 현황판과 함께 키워드·글·이미지 제작 흐름을 한 화면에서 관리합니다.",
-    requests: ["노션 현황판 기준으로 콘텐츠 진행 상태를 계속 맞춰주세요."],
+      "OH 쌤의 교육 철학과 실전 수업 가치를 콘텐츠로 정리하고, 키워드·글·이미지·발행 현황을 한 화면에서 관리합니다.",
+    requests: ["발행 현황과 검수 요청을 한 화면에서 확인하고 싶어요."],
+    publishDates: ["7월 2주차 화요일", "7월 3주차 목요일", "7월 4주차 금요일"],
+    publications: [
+      {
+        id: "pub-1",
+        companyName: "OH 쌤 Principle & Practice 2025",
+        publishDate: "2026-07-14",
+        title: "OH 쌤 Principle & Practice 2025 운영 소개",
+        url: "",
+      },
+    ],
     contents: [
       {
         id: "content-1",
@@ -23,7 +33,7 @@ const seedClients = [
           "OH 쌤의 Principle & Practice 운영 방향을 소개하는 콘텐츠입니다. 원리 이해와 실전 적용이 어떻게 연결되는지 학부모와 학생이 쉽게 이해할 수 있도록 구성합니다.",
         image:
           "강의 노트, 수업 원리 카드, 실전 문제 풀이 자료가 정돈된 교육 콘텐츠 이미지",
-        url: notionLink,
+        url: "",
         status: "검수 대기",
         due: "1차 정리",
         capture: null,
@@ -97,6 +107,8 @@ function normalizeClient(client) {
   return {
     ...client,
     requests: client.requests || [],
+    publishDates: normalizePublishDates(client.publishDates),
+    publications: normalizePublications(client),
     contents: (client.contents || []).map((item, index) => ({
       id: item.id || `content-${Date.now()}-${index}`,
       keyword: item.keyword || "새 키워드",
@@ -110,6 +122,32 @@ function normalizeClient(client) {
       feedback: item.feedback || null,
     })),
   };
+}
+
+function normalizePublishDates(dates = []) {
+  const normalized = Array.isArray(dates) ? dates.slice(0, 3) : [];
+  while (normalized.length < 3) normalized.push("");
+  return normalized;
+}
+
+function normalizePublications(client) {
+  const rows = Array.isArray(client.publications)
+    ? client.publications
+    : (client.contents || []).filter((item) => item.title || item.url || item.due).slice(0, 3).map((item, index) => ({
+        id: `pub-${Date.now()}-${index}`,
+        companyName: client.name || "업체명",
+        publishDate: item.due || "",
+        title: item.title || "",
+        url: item.url || "",
+      }));
+
+  return rows.map((row, index) => ({
+    id: row.id || `pub-${Date.now()}-${index}`,
+    companyName: row.companyName || client.name || "업체명",
+    publishDate: row.publishDate || "",
+    title: row.title || "",
+    url: row.url || "",
+  }));
 }
 
 function loadAiConfig() {
@@ -209,6 +247,8 @@ function renderAdmin() {
   $("#pageTitle").textContent =
     currentView === "admin" ? "콘텐츠 대행 대시보드" : `${client.name} 공유 현황`;
 
+  renderDashboardSummary(client);
+
   $("#pipeline").innerHTML = client.contents
     .map(
       (item, index) => `
@@ -232,8 +272,76 @@ function renderAdmin() {
 
   renderEditor();
   renderClientForm();
+  renderPublicationEditor(client);
   renderAiPanel();
   renderCapturePanel();
+}
+
+function renderDashboardSummary(active) {
+  $("#companyOverview").innerHTML = clients
+    .map((client) => {
+      const published = client.publications.filter((row) => row.title || row.url).length;
+      return `
+        <button class="company-row ${client.id === active.id ? "active" : ""}" data-company-id="${client.id}" type="button">
+          <span><strong>${escapeHtml(client.name)}</strong><small>${escapeHtml(client.owner || "원장님")} · ${escapeHtml(client.area || "분야 미입력")}</small></span>
+          <b>${published}건</b>
+        </button>
+      `;
+    })
+    .join("");
+
+  $("#companyOverview").querySelectorAll(".company-row").forEach((button) => {
+    button.addEventListener("click", () => {
+      currentClientId = button.dataset.companyId;
+      currentContentIndex = 0;
+      renderAll();
+    });
+  });
+
+  $("#weeklyOverview").innerHTML = clients
+    .map((client) => {
+      const dates = normalizePublishDates(client.publishDates).filter(Boolean);
+      const dateText = dates.length ? dates.join(" / ") : "발행일자 미입력";
+      return `
+        <article class="weekly-row ${client.id === active.id ? "active" : ""}">
+          <strong>${escapeHtml(client.name)}</strong>
+          <span>${escapeHtml(dateText)}</span>
+        </article>
+      `;
+    })
+    .join("");
+
+  normalizePublishDates(active.publishDates).forEach((value, index) => {
+    $(`#publishDateInput${index + 1}`).value = value;
+  });
+}
+
+function renderPublicationEditor(client) {
+  const editor = $("#publicationEditor");
+  if (!client.publications.length) {
+    editor.innerHTML = `<p class="empty-note">아직 발행현황 행이 없습니다. 행 추가를 눌러 입력하세요.</p>`;
+    return;
+  }
+
+  editor.innerHTML = client.publications
+    .map((row, index) => `
+      <article class="publication-row" data-publication-index="${index}">
+        <label>업체명<input class="publication-company" type="text" value="${escapeHtml(row.companyName)}" /></label>
+        <label>발행날짜<input class="publication-date" type="text" value="${escapeHtml(row.publishDate)}" placeholder="예: 2026-07-14" /></label>
+        <label>제목<input class="publication-title" type="text" value="${escapeHtml(row.title)}" /></label>
+        <label>링크<input class="publication-url" type="url" value="${escapeHtml(row.url)}" placeholder="https://..." /></label>
+        <div class="publication-actions">
+          <button class="secondary-button save-publication" type="button">저장</button>
+          <button class="text-danger delete-publication" type="button">삭제</button>
+        </div>
+      </article>
+    `)
+    .join("");
+
+  editor.querySelectorAll(".publication-row").forEach((row) => {
+    row.querySelector(".save-publication").addEventListener("click", () => savePublicationRow(row));
+    row.querySelector(".delete-publication").addEventListener("click", () => deletePublicationRow(row));
+  });
 }
 
 function renderEditor() {
@@ -284,6 +392,28 @@ function renderCapturePanel() {
     : `<p class="empty-note">원장님 피드백이 아직 없습니다.</p>`;
 }
 
+function renderPortalPublication(client) {
+  const rows = client.publications || [];
+  if (!rows.length) {
+    $("#portalPublication").innerHTML = `<p class="empty-note">아직 공유된 발행현황이 없습니다.</p>`;
+    return;
+  }
+
+  $("#portalPublication").innerHTML = `
+    <div class="publication-head"><span>업체명</span><span>발행날짜</span><span>제목</span><span>링크</span></div>
+    ${rows
+      .map((row) => `
+        <article class="publication-line">
+          <span>${escapeHtml(row.companyName)}</span>
+          <span>${escapeHtml(row.publishDate || "일정 미정")}</span>
+          <strong>${escapeHtml(row.title || "제목 미입력")}</strong>
+          ${row.url ? `<a href="${escapeHtml(row.url)}" target="_blank" rel="noreferrer">열기</a>` : `<em>준비중</em>`}
+        </article>
+      `)
+      .join("")}
+  `;
+}
+
 function renderPortal() {
   const client = activeClient();
   const progress = progressFor(client);
@@ -291,6 +421,8 @@ function renderPortal() {
   $("#portalTitle").textContent = `${client.name} ${client.period || "마케팅 진행 현황"}`;
   $("#portalSummary").textContent = `${client.owner}, ${client.area} 기준으로 키워드 선정, 글 작성, 이미지 제작, 발행 현황을 순차적으로 공유합니다.`;
   $("#portalProgress").textContent = `${progress}%`;
+
+  renderPortalPublication(client);
 
   $("#portalContent").innerHTML = client.contents
     .map((item) => {
@@ -375,6 +507,51 @@ function renderPortalFeedback(client) {
   });
 }
 
+function savePublishDates() {
+  const client = activeClient();
+  client.publishDates = [1, 2, 3].map((number) => $(`#publishDateInput${number}`).value.trim());
+  saveState();
+  renderAll();
+  showToast("발행일자가 저장되었습니다.");
+}
+
+function addPublication() {
+  const client = activeClient();
+  client.publications.push({
+    id: `pub-${Date.now()}`,
+    companyName: client.name,
+    publishDate: "",
+    title: "",
+    url: "",
+  });
+  saveState();
+  renderAll();
+  showToast("발행현황 행을 추가했습니다.");
+}
+
+function savePublicationRow(rowElement) {
+  const client = activeClient();
+  const index = Number(rowElement.dataset.publicationIndex);
+  const row = client.publications[index];
+  if (!row) return;
+  row.companyName = rowElement.querySelector(".publication-company").value.trim() || client.name;
+  row.publishDate = rowElement.querySelector(".publication-date").value.trim();
+  row.title = rowElement.querySelector(".publication-title").value.trim();
+  row.url = rowElement.querySelector(".publication-url").value.trim();
+  saveState();
+  renderAll();
+  showToast("발행현황이 저장되었습니다.");
+}
+
+function deletePublicationRow(rowElement) {
+  const client = activeClient();
+  const index = Number(rowElement.dataset.publicationIndex);
+  client.publications.splice(index, 1);
+  saveState();
+  renderAll();
+  showToast("발행현황 행을 삭제했습니다.");
+}
+
 function saveCurrentContent() {
   const item = activeContent();
   item.keyword = $("#keywordInput").value.trim() || item.keyword;
@@ -419,6 +596,8 @@ function addClient() {
     period: "운영 현황",
     summary: "업체의 마케팅 운영 방향을 입력하세요.",
     requests: [],
+    publishDates: ["", "", ""],
+    publications: [],
     contents: [
       {
         id: `content-${Date.now()}`,
@@ -574,6 +753,8 @@ function bindEvents() {
   $("#openClientView").addEventListener("click", () => switchView("client"));
   $("#addKeyword").addEventListener("click", () => addKeyword(true));
   $("#addClient").addEventListener("click", addClient);
+  $("#savePublishDates").addEventListener("click", savePublishDates);
+  $("#addPublication").addEventListener("click", addPublication);
   $("#saveClient").addEventListener("click", saveClient);
   $("#saveContent").addEventListener("click", saveCurrentContent);
   $("#captureInput").addEventListener("change", handleCaptureUpload);
@@ -622,6 +803,8 @@ function renderAll() {
 bindEvents();
 renderAll();
 applyHash();
+
+
 
 
 

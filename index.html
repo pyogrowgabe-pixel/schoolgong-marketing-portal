@@ -44,14 +44,6 @@
             <h1 id="pageTitle">콘텐츠 대행 대시보드</h1>
           </div>
           <div class="topbar-actions">
-            <a
-              class="link-button"
-              href="https://candle-licorice-39c.notion.site/301c3667c16480cb9a3fce3a5d1169bc?v=301c3667c16481fe85b5000cd1a69667&source=copy_link"
-              target="_blank"
-              rel="noreferrer"
-            >
-              노션 현황
-            </a>
             <button id="copyShareLink" class="icon-button" type="button" title="공유 링크 복사">
               <svg aria-hidden="true" viewBox="0 0 24 24">
                 <path d="M10 13a5 5 0 0 0 7.1 0l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
@@ -88,6 +80,43 @@
               <strong id="feedbackMetric">0</strong>
               <small>원장님 응답</small>
             </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="section-label">업체 전체리스트</p>
+                  <h2>운영 업체</h2>
+                </div>
+              </div>
+              <div id="companyOverview" class="company-overview"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="section-label">주별 발행현황</p>
+                  <h2>업체별 이번 주 체크</h2>
+                </div>
+              </div>
+              <div id="weeklyOverview" class="weekly-overview"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="section-label">발행일자</p>
+                  <h2>최대 3개 일정</h2>
+                </div>
+                <button id="savePublishDates" class="secondary-button" type="button">일정 저장</button>
+              </div>
+              <div class="publish-date-grid">
+                <label>1차 발행일<input id="publishDateInput1" type="text" placeholder="예: 7월 2주차 화요일" /></label>
+                <label>2차 발행일<input id="publishDateInput2" type="text" placeholder="예: 7월 3주차 목요일" /></label>
+                <label>3차 발행일<input id="publishDateInput3" type="text" placeholder="예: 7월 4주차 금요일" /></label>
+              </div>
+            </section>
           </div>
 
           <div class="content-layout">
@@ -169,6 +198,17 @@
               <label class="wide-label">운영 요약<textarea id="clientSummaryInput" rows="4"></textarea></label>
             </section>
 
+            <section class="panel publication-panel">
+              <div class="panel-header">
+                <div>
+                  <p class="section-label">발행현황</p>
+                  <h2>원장님 공유용 표</h2>
+                </div>
+                <button id="addPublication" class="secondary-button" type="button">행 추가</button>
+              </div>
+              <div id="publicationEditor" class="publication-editor"></div>
+            </section>
+
             <section class="panel ai-panel">
               <div class="panel-header">
                 <div>
@@ -225,8 +265,18 @@
             <section class="portal-section">
               <div class="panel-header">
                 <div>
+                  <p class="section-label">발행현황</p>
+                  <h2>공유용 발행 리스트</h2>
+                </div>
+              </div>
+              <div id="portalPublication" class="publication-table"></div>
+            </section>
+
+            <section class="portal-section">
+              <div class="panel-header">
+                <div>
                   <p class="section-label">이번 달 콘텐츠</p>
-                  <h2>진행 및 발행 현황</h2>
+                  <h2>콘텐츠 진행 현황</h2>
                 </div>
               </div>
               <div id="portalContent" class="portal-list"></div>
@@ -260,3 +310,4 @@
     <script src="./app.js"></script>
   </body>
 </html>
+
