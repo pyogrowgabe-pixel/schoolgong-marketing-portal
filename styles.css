@@ -1007,3 +1007,138 @@ select:focus {
     grid-template-columns: 1fr;
   }
 }
+
+.operations-panel {
+  margin-bottom: 16px;
+}
+
+.operations-header {
+  align-items: flex-end;
+}
+
+.week-control {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.week-control label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.operations-table-wrap {
+  overflow-x: auto;
+}
+
+.operations-table {
+  display: grid;
+  gap: 8px;
+  min-width: 1080px;
+}
+
+.operations-head,
+.operations-row {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.15fr) 104px 132px 150px minmax(210px, 1fr) minmax(180px, 0.9fr) 82px;
+  gap: 10px;
+  align-items: center;
+}
+
+.operations-head {
+  padding: 0 12px 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.operations-row,
+.account-panel {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfc;
+}
+
+.operations-row.active {
+  border-color: var(--teal);
+  box-shadow: inset 4px 0 0 var(--teal);
+}
+
+.operation-client {
+  border: 0;
+  padding: 0;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+
+.operation-client strong,
+.operation-client small {
+  display: block;
+}
+
+.operation-client small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.account-toggle {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--teal-dark);
+  background: #ecf8f6;
+  font-weight: 900;
+}
+
+.account-panel {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+  margin-left: 22px;
+  background: #fffdf8;
+}
+
+.account-panel label {
+  display: grid;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.operation-status {
+  background: #ffffff;
+}
+
+@media (max-width: 1120px) {
+  .operations-header,
+  .week-control {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .operations-table {
+    min-width: 0;
+  }
+
+  .operations-head {
+    display: none;
+  }
+
+  .operations-row,
+  .account-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .account-panel {
+    margin-left: 0;
+  }
+}

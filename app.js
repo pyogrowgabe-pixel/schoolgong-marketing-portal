@@ -1,9 +1,19 @@
 ﻿const STORAGE_KEY = "schoolgong-marketing-mvp-workflow-v2";
 const AI_CONFIG_KEY = "schoolgong-openai-proxy-v2";
+const WEEK_LABEL_KEY = "schoolgong-dashboard-week-label-v1";
 
 const notionLink =
   "https://candle-licorice-39c.notion.site/301c3667c16480cb9a3fce3a5d1169bc?v=301c3667c16481fe85b5000cd1a69667&source=copy_link";
 
+const sheetSeedCompanies = [
+  { name: "내곡해법수학", memo: "" },
+  { name: "더원수학 (테크노)", memo: "주2회 -> 주1회" },
+  { name: "라인아츠미술", memo: "" },
+  { name: "창원엘루미나erc", memo: "" },
+  { name: "대한민국입시학원", memo: "" },
+  { name: "데비스영어", memo: "" },
+  { name: "최강공부방(해법)", memo: "" },
+];
 const seedClients = [
   {
     id: "oh-ssam",
@@ -15,6 +25,8 @@ const seedClients = [
       "OH 쌤의 교육 철학과 실전 수업 가치를 콘텐츠로 정리하고, 키워드·글·이미지·발행 현황을 한 화면에서 관리합니다.",
     requests: ["발행 현황과 검수 요청을 한 화면에서 확인하고 싶어요."],
     publishDates: ["7월 2주차 화요일", "7월 3주차 목요일", "7월 4주차 금요일"],
+    account: { loginId: "", password: "", siteUrl: "", memo: "" },
+    operation: { status: "작성중", publishDate: "", publishUrl: "", memo: "" },
     publications: [
       {
         id: "pub-1",
@@ -81,6 +93,8 @@ const statusOrder = [
 
 let clients = loadClients();
 let aiConfig = loadAiConfig();
+let dashboardWeekLabel = loadWeekLabel();
+let openAccountClientId = null;
 let currentClientId = clients[0].id;
 let currentContentIndex = 0;
 let currentView = "admin";
@@ -97,9 +111,9 @@ function loadClients() {
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
     const parsed = saved ? JSON.parse(saved) : clone(seedClients);
-    return parsed.map(normalizeClient);
+    return mergeSheetClients(parsed).map(normalizeClient);
   } catch {
-    return clone(seedClients).map(normalizeClient);
+    return mergeSheetClients(clone(seedClients)).map(normalizeClient);
   }
 }
 
@@ -108,6 +122,8 @@ function normalizeClient(client) {
     ...client,
     requests: client.requests || [],
     publishDates: normalizePublishDates(client.publishDates),
+    account: normalizeAccount(client.account),
+    operation: normalizeOperation(client.operation),
     publications: normalizePublications(client),
     contents: (client.contents || []).map((item, index) => ({
       id: item.id || `content-${Date.now()}-${index}`,
@@ -148,6 +164,75 @@ function normalizePublications(client) {
     title: row.title || "",
     url: row.url || "",
   }));
+}
+
+function normalizeAccount(account = {}) {
+  return {
+    loginId: account.loginId || "",
+    password: account.password || "",
+    siteUrl: account.siteUrl || "",
+    memo: account.memo || "",
+  };
+}
+
+function normalizeOperation(operation = {}) {
+  return {
+    status: operation.status || "미진행",
+    publishDate: operation.publishDate || "",
+    publishUrl: operation.publishUrl || "",
+    memo: operation.memo || "",
+  };
+}
+
+function makeSeedClient(company, index) {
+  return {
+    id: `sheet-client-${index}-${company.name.replace(/[^a-zA-Z0-9가-힣]/g, "-")}`,
+    name: company.name,
+    area: "시트 등록 업체",
+    owner: "원장님",
+    period: "2026년 7월 2주차",
+    summary: `${company.name}의 7월 2주차 발행 상태와 계정 정보를 관리합니다.`,
+    requests: [],
+    publishDates: ["", "", ""],
+    account: { loginId: "", password: "", siteUrl: "", memo: "" },
+    operation: { status: company.memo ? "확인필요" : "미진행", publishDate: "", publishUrl: "", memo: company.memo || "" },
+    publications: [],
+    contents: [
+      {
+        id: `content-${Date.now()}-${index}`,
+        keyword: company.name,
+        title: `${company.name} 7월 2주차 발행 콘텐츠`,
+        body: "",
+        image: "",
+        url: "",
+        status: "키워드 선정",
+        due: "2026년 7월 2주차",
+        capture: null,
+        feedback: null,
+      },
+    ],
+  };
+}
+
+function mergeSheetClients(sourceClients) {
+  const merged = Array.isArray(sourceClients) ? clone(sourceClients) : [];
+  sheetSeedCompanies.forEach((company, index) => {
+    const exists = merged.some((client) => client.name === company.name);
+    if (!exists) merged.push(makeSeedClient(company, index));
+  });
+  return merged;
+}
+
+function loadWeekLabel() {
+  try {
+    return window.localStorage.getItem(WEEK_LABEL_KEY) || "2026년 7월 2주차";
+  } catch {
+    return "2026년 7월 2주차";
+  }
+}
+
+function saveWeekLabel() {
+  window.localStorage.setItem(WEEK_LABEL_KEY, dashboardWeekLabel);
 }
 
 function loadAiConfig() {
@@ -247,7 +332,7 @@ function renderAdmin() {
   $("#pageTitle").textContent =
     currentView === "admin" ? "콘텐츠 대행 대시보드" : `${client.name} 공유 현황`;
 
-  renderDashboardSummary(client);
+  renderOperationsDashboard();
 
   $("#pipeline").innerHTML = client.contents
     .map(
@@ -277,42 +362,79 @@ function renderAdmin() {
   renderCapturePanel();
 }
 
-function renderDashboardSummary(active) {
-  $("#companyOverview").innerHTML = clients
-    .map((client) => {
-      const published = client.publications.filter((row) => row.title || row.url).length;
-      return `
-        <button class="company-row ${client.id === active.id ? "active" : ""}" data-company-id="${client.id}" type="button">
-          <span><strong>${escapeHtml(client.name)}</strong><small>${escapeHtml(client.owner || "원장님")} · ${escapeHtml(client.area || "분야 미입력")}</small></span>
-          <b>${published}건</b>
-        </button>
-      `;
-    })
-    .join("");
+function renderOperationsDashboard() {
+  const statusOptions = ["미진행", "작성중", "예약완료", "발행완료", "수정요청", "확인필요"];
+  $("#weekLabelInput").value = dashboardWeekLabel;
+  $("#operationsDashboard").innerHTML = `
+    <div class="operations-head">
+      <span>업체명</span>
+      <span>계정</span>
+      <span>상태</span>
+      <span>발행날짜</span>
+      <span>발행링크</span>
+      <span>메모</span>
+      <span>선택</span>
+    </div>
+    ${clients
+      .map((client) => {
+        const operation = normalizeOperation(client.operation);
+        const account = normalizeAccount(client.account);
+        const isOpen = openAccountClientId === client.id;
+        const accountLabel = account.loginId || account.password ? "계정 보기" : "계정 입력";
+        return `
+          <article class="operations-row ${client.id === currentClientId ? "active" : ""}" data-client-id="${client.id}">
+            <button class="operation-client" type="button" data-select-client="${client.id}">
+              <strong>${escapeHtml(client.name)}</strong>
+              <small>${escapeHtml(client.area || "분야 미입력")}</small>
+            </button>
+            <button class="account-toggle" type="button" data-account-client="${client.id}">${accountLabel}</button>
+            <select class="operation-status">
+              ${statusOptions.map((status) => `<option ${operation.status === status ? "selected" : ""}>${status}</option>`).join("")}
+            </select>
+            <input class="operation-date" type="text" value="${escapeHtml(operation.publishDate)}" placeholder="예: 2026-07-08" />
+            <input class="operation-url" type="url" value="${escapeHtml(operation.publishUrl)}" placeholder="https://..." />
+            <input class="operation-memo" type="text" value="${escapeHtml(operation.memo)}" placeholder="주2회 -> 주1회 등" />
+            <button class="secondary-button operation-save" type="button">저장</button>
+          </article>
+          ${isOpen ? `
+            <article class="account-panel" data-account-panel="${client.id}">
+              <label>아이디<input class="account-login" type="text" value="${escapeHtml(account.loginId)}" placeholder="관리자만 입력" /></label>
+              <label>비밀번호<input class="account-password" type="text" value="${escapeHtml(account.password)}" placeholder="관리자만 입력" /></label>
+              <label>접속 링크<input class="account-url" type="url" value="${escapeHtml(account.siteUrl)}" placeholder="https://..." /></label>
+              <label>계정 메모<input class="account-memo" type="text" value="${escapeHtml(account.memo)}" placeholder="주의사항" /></label>
+              <button class="primary-button account-save" type="button">계정 저장</button>
+            </article>
+          ` : ""}
+        `;
+      })
+      .join("")}
+  `;
 
-  $("#companyOverview").querySelectorAll(".company-row").forEach((button) => {
+  $("#operationsDashboard").querySelectorAll("[data-select-client]").forEach((button) => {
     button.addEventListener("click", () => {
-      currentClientId = button.dataset.companyId;
+      currentClientId = button.dataset.selectClient;
       currentContentIndex = 0;
       renderAll();
     });
   });
 
-  $("#weeklyOverview").innerHTML = clients
-    .map((client) => {
-      const dates = normalizePublishDates(client.publishDates).filter(Boolean);
-      const dateText = dates.length ? dates.join(" / ") : "발행일자 미입력";
-      return `
-        <article class="weekly-row ${client.id === active.id ? "active" : ""}">
-          <strong>${escapeHtml(client.name)}</strong>
-          <span>${escapeHtml(dateText)}</span>
-        </article>
-      `;
-    })
-    .join("");
+  $("#operationsDashboard").querySelectorAll(".account-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      openAccountClientId = openAccountClientId === button.dataset.accountClient ? null : button.dataset.accountClient;
+      renderAll();
+    });
+  });
 
-  normalizePublishDates(active.publishDates).forEach((value, index) => {
-    $(`#publishDateInput${index + 1}`).value = value;
+  $("#operationsDashboard").querySelectorAll(".operation-save").forEach((button) => {
+    button.addEventListener("click", () => {
+      saveOperationRow(button.closest(".operations-row"));
+    });
+  });
+
+  $("#operationsDashboard").querySelectorAll(".account-save").forEach((button) => {
+    button.addEventListener("click", () => {
+      saveAccountPanel(button.closest(".account-panel"));
+    });
   });
 }
 
@@ -507,12 +629,67 @@ function renderPortalFeedback(client) {
   });
 }
 
-function savePublishDates() {
-  const client = activeClient();
-  client.publishDates = [1, 2, 3].map((number) => $(`#publishDateInput${number}`).value.trim());
+function saveOperationRows() {
+  dashboardWeekLabel = $("#weekLabelInput").value.trim() || "2026년 7월 2주차";
+  $("#operationsDashboard").querySelectorAll(".operations-row").forEach((row) => saveOperationRow(row, false));
+  saveWeekLabel();
   saveState();
   renderAll();
-  showToast("발행일자가 저장되었습니다.");
+  showToast("업체 운영 대시보드를 저장했습니다.");
+}
+
+function saveOperationRow(rowElement, shouldRender = true) {
+  if (!rowElement) return;
+  const client = clients.find((item) => item.id === rowElement.dataset.clientId);
+  if (!client) return;
+  client.operation = {
+    status: rowElement.querySelector(".operation-status").value,
+    publishDate: rowElement.querySelector(".operation-date").value.trim(),
+    publishUrl: rowElement.querySelector(".operation-url").value.trim(),
+    memo: rowElement.querySelector(".operation-memo").value.trim(),
+  };
+  syncOperationToPublication(client);
+  if (shouldRender) {
+    dashboardWeekLabel = $("#weekLabelInput").value.trim() || dashboardWeekLabel;
+    saveWeekLabel();
+    saveState();
+    renderAll();
+    showToast("업체 발행상태가 저장되었습니다.");
+  }
+}
+
+function saveAccountPanel(panelElement) {
+  if (!panelElement) return;
+  const client = clients.find((item) => item.id === panelElement.dataset.accountPanel);
+  if (!client) return;
+  client.account = {
+    loginId: panelElement.querySelector(".account-login").value.trim(),
+    password: panelElement.querySelector(".account-password").value.trim(),
+    siteUrl: panelElement.querySelector(".account-url").value.trim(),
+    memo: panelElement.querySelector(".account-memo").value.trim(),
+  };
+  saveState();
+  renderAll();
+  showToast("계정 정보가 저장되었습니다.");
+}
+
+function syncOperationToPublication(client) {
+  const operation = normalizeOperation(client.operation);
+  if (!operation.publishDate && !operation.publishUrl) return;
+  const firstContent = client.contents[0] || {};
+  const title = firstContent.title || `${client.name} ${dashboardWeekLabel} 발행 콘텐츠`;
+  const row = client.publications[0] || {
+    id: `pub-${Date.now()}`,
+    companyName: client.name,
+    publishDate: "",
+    title,
+    url: "",
+  };
+  row.companyName = client.name;
+  row.publishDate = operation.publishDate;
+  row.title = title;
+  row.url = operation.publishUrl;
+  client.publications[0] = row;
 }
 
 function addPublication() {
@@ -753,7 +930,7 @@ function bindEvents() {
   $("#openClientView").addEventListener("click", () => switchView("client"));
   $("#addKeyword").addEventListener("click", () => addKeyword(true));
   $("#addClient").addEventListener("click", addClient);
-  $("#savePublishDates").addEventListener("click", savePublishDates);
+  $("#saveOperationRows").addEventListener("click", saveOperationRows);
   $("#addPublication").addEventListener("click", addPublication);
   $("#saveClient").addEventListener("click", saveClient);
   $("#saveContent").addEventListener("click", saveCurrentContent);
@@ -803,6 +980,11 @@ function renderAll() {
 bindEvents();
 renderAll();
 applyHash();
+
+
+
+
+
 
 
 
