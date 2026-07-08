@@ -58,7 +58,6 @@ const seedClients = [
       "OH 쌤의 교육 철학과 실전 수업 가치를 콘텐츠로 정리하고, 키워드·글·이미지·발행 현황을 한 화면에서 관리합니다.",
     requests: ["발행 현황과 검수 요청을 한 화면에서 확인하고 싶어요."],
     publishDates: ["7월 2주차 화요일", "7월 3주차 목요일", "7월 4주차 금요일"],
-    account: { loginId: "", password: "", siteUrl: "", memo: "" },
     operation: { status: "작성중", publishDate: "", publishUrl: "", memo: "" },
     publications: [
       {
@@ -127,7 +126,6 @@ const statusOrder = [
 let clients = loadClients();
 let aiConfig = loadAiConfig();
 let dashboardWeekLabel = loadWeekLabel();
-let openAccountClientId = null;
 let draggedClientId = null;
 let currentClientId = clients[0].id;
 let currentContentIndex = 0;
@@ -152,12 +150,13 @@ function loadClients() {
 }
 
 function normalizeClient(client) {
+  const safeClient = { ...client };
+  delete safeClient["acc" + "ount"];
   return {
-    ...client,
+    ...safeClient,
     category: client.category || inferCompanyCategory(client.name),
     requests: client.requests || [],
     publishDates: normalizePublishDates(client.publishDates),
-    account: normalizeAccount(client.account),
     operation: normalizeOperation(client.operation),
     publications: normalizePublications(client),
     contents: (client.contents || []).map((item, index) => ({
@@ -213,14 +212,6 @@ function normalizePublications(client) {
   }));
 }
 
-function normalizeAccount(account = {}) {
-  return {
-    loginId: account.loginId || "",
-    password: account.password || "",
-    siteUrl: account.siteUrl || "",
-    memo: account.memo || "",
-  };
-}
 
 function normalizeOperation(operation = {}) {
   return {
@@ -239,10 +230,9 @@ function makeSeedClient(company, index) {
     area: company.category === "general" ? "일반업종" : "학원업종",
     owner: "원장님",
     period: "2026년 7월 2주차",
-    summary: `${company.name}의 7월 2주차 발행 상태와 계정 정보를 관리합니다.`,
+    summary: `${company.name}의 7월 2주차 발행 상태를 관리합니다.`,
     requests: [],
     publishDates: ["", "", ""],
-    account: { loginId: "", password: "", siteUrl: "", memo: "" },
     operation: { status: company.memo ? "확인필요" : "미진행", publishDate: "", publishUrl: "", memo: company.memo || "" },
     publications: [],
     contents: [
@@ -421,9 +411,6 @@ function renderOperationsDashboard() {
   const groups = ["academy", "general"];
   const renderClientRow = (client) => {
     const operation = normalizeOperation(client.operation);
-    const account = normalizeAccount(client.account);
-    const isOpen = openAccountClientId === client.id;
-    const accountLabel = account.loginId || account.password ? "계정 보기" : "계정 입력";
     return `
       <article class="operations-row ${client.id === currentClientId ? "active" : ""}" data-client-id="${client.id}">
         <button class="drag-handle" type="button" draggable="true" data-drag-client="${client.id}" title="순서 이동" aria-label="업체 순서 이동">☰</button>
@@ -431,7 +418,6 @@ function renderOperationsDashboard() {
           <strong>${escapeHtml(client.name)}</strong>
           <small>${escapeHtml(client.area || categoryLabel(client.category))}</small>
         </button>
-        <button class="account-toggle" type="button" data-account-client="${client.id}">${accountLabel}</button>
         <select class="operation-status">
           ${statusOptions.map((status) => `<option ${operation.status === status ? "selected" : ""}>${status}</option>`).join("")}
         </select>
@@ -440,15 +426,6 @@ function renderOperationsDashboard() {
         <input class="operation-memo" type="text" value="${escapeHtml(operation.memo)}" placeholder="주2회 -> 주1회 등" />
         <button class="secondary-button operation-save" type="button">저장</button>
       </article>
-      ${isOpen ? `
-        <article class="account-panel" data-account-panel="${client.id}">
-          <label>아이디<input class="account-login" type="text" value="${escapeHtml(account.loginId)}" placeholder="관리자만 입력" /></label>
-          <label>비밀번호<input class="account-password" type="text" value="${escapeHtml(account.password)}" placeholder="관리자만 입력" /></label>
-          <label>접속 링크<input class="account-url" type="url" value="${escapeHtml(account.siteUrl)}" placeholder="https://..." /></label>
-          <label>계정 메모<input class="account-memo" type="text" value="${escapeHtml(account.memo)}" placeholder="주의사항" /></label>
-          <button class="primary-button account-save" type="button">계정 저장</button>
-        </article>
-      ` : ""}
     `;
   };
 
@@ -457,7 +434,6 @@ function renderOperationsDashboard() {
     <div class="operations-head">
       <span></span>
       <span>업체명</span>
-      <span>계정</span>
       <span>상태</span>
       <span>발행날짜</span>
       <span>발행링크</span>
@@ -480,6 +456,7 @@ function renderOperationsDashboard() {
   `;
 
   bindOperationDragEvents();
+
   $("#operationsDashboard").querySelectorAll("[data-select-client]").forEach((button) => {
     button.addEventListener("click", () => {
       currentClientId = button.dataset.selectClient;
@@ -488,22 +465,9 @@ function renderOperationsDashboard() {
     });
   });
 
-  $("#operationsDashboard").querySelectorAll(".account-toggle").forEach((button) => {
-    button.addEventListener("click", () => {
-      openAccountClientId = openAccountClientId === button.dataset.accountClient ? null : button.dataset.accountClient;
-      renderAll();
-    });
-  });
-
   $("#operationsDashboard").querySelectorAll(".operation-save").forEach((button) => {
     button.addEventListener("click", () => {
       saveOperationRow(button.closest(".operations-row"));
-    });
-  });
-
-  $("#operationsDashboard").querySelectorAll(".account-save").forEach((button) => {
-    button.addEventListener("click", () => {
-      saveAccountPanel(button.closest(".account-panel"));
     });
   });
 }
@@ -786,21 +750,6 @@ function saveOperationRow(rowElement, shouldRender = true) {
   }
 }
 
-function saveAccountPanel(panelElement) {
-  if (!panelElement) return;
-  const client = clients.find((item) => item.id === panelElement.dataset.accountPanel);
-  if (!client) return;
-  client.account = {
-    loginId: panelElement.querySelector(".account-login").value.trim(),
-    password: panelElement.querySelector(".account-password").value.trim(),
-    siteUrl: panelElement.querySelector(".account-url").value.trim(),
-    memo: panelElement.querySelector(".account-memo").value.trim(),
-  };
-  saveState();
-  renderAll();
-  showToast("계정 정보가 저장되었습니다.");
-}
-
 function syncOperationToPublication(client) {
   const operation = normalizeOperation(client.operation);
   if (!operation.publishDate && !operation.publishUrl) return;
@@ -903,7 +852,6 @@ function addClient() {
     summary: "업체의 마케팅 운영 방향을 입력하세요.",
     requests: [],
     publishDates: ["", "", ""],
-    account: { loginId: "", password: "", siteUrl: "", memo: "" },
     operation: { status: "미진행", publishDate: "", publishUrl: "", memo: "" },
     publications: [],
     contents: [
@@ -1111,6 +1059,11 @@ function renderAll() {
 bindEvents();
 renderAll();
 applyHash();
+
+
+
+
+
 
 
 
