@@ -192,6 +192,10 @@ function normalizeClient(client) {
   return {
     ...safeClient,
     category: client.category || inferCompanyCategory(client.name),
+    isArchived: Boolean(client.isArchived),
+    archivedAt: client.archivedAt || "",
+    isDeleted: Boolean(client.isDeleted),
+    deletedAt: client.deletedAt || "",
     requests: client.requests || [],
     publishDates: normalizePublishDates(client.publishDates),
     operation: normalizeOperation(client.operation),
@@ -382,8 +386,27 @@ function safeExternalUrl(value = "") {
   }
 }
 
+function visibleClients() {
+  return clients.filter((client) => !client.isDeleted);
+}
+
+function activeClients() {
+  return visibleClients().filter((client) => !client.isArchived);
+}
+
+function archivedClients() {
+  return visibleClients().filter((client) => client.isArchived);
+}
+
+function ensureCurrentClient() {
+  if (visibleClients().some((client) => client.id === currentClientId)) return;
+  const fallback = activeClients()[0] || archivedClients()[0] || clients.find((client) => !client.isDeleted);
+  if (fallback) currentClientId = fallback.id;
+}
+
 function activeClient() {
-  return clients.find((client) => client.id === currentClientId) || clients[0];
+  ensureCurrentClient();
+  return visibleClients().find((client) => client.id === currentClientId) || clients.find((client) => !client.isDeleted) || clients[0];
 }
 
 function activeContent() {
@@ -429,13 +452,31 @@ function escapeHtml(value = "") {
 
 function renderClients() {
   const list = $("#clientList");
-  list.innerHTML = clients
+  const groups = [
+    { title: "진행 업체", items: activeClients(), empty: "진행 중인 업체가 없습니다." },
+    { title: "보관 업체", items: archivedClients(), empty: "보관된 업체가 없습니다." },
+  ];
+
+  list.innerHTML = groups
     .map(
-      (client) => `
-        <button class="client-card ${client.id === currentClientId ? "active" : ""}" data-client="${client.id}" type="button">
-          <strong>${escapeHtml(client.name)}</strong>
-          <span>${escapeHtml(client.area)}</span>
-        </button>
+      (group) => `
+        <div class="client-group">
+          <p class="client-group-title">${group.title} <span>${group.items.length}</span></p>
+          ${
+            group.items.length
+              ? group.items
+                  .map(
+                    (client) => `
+                      <button class="client-card ${client.isArchived ? "archived" : ""} ${client.id === currentClientId ? "active" : ""}" data-client="${client.id}" type="button">
+                        <strong>${escapeHtml(client.name)}</strong>
+                        <span>${escapeHtml(client.area || categoryLabel(client.category))}</span>
+                      </button>
+                    `
+                  )
+                  .join("")
+              : `<p class="empty-client-note">${group.empty}</p>`
+          }
+        </div>
       `
     )
     .join("");
@@ -529,7 +570,7 @@ function renderOperationsDashboard() {
     </div>
     ${groups
       .map((category) => {
-        const groupClients = clients.filter((client) => (client.category || inferCompanyCategory(client.name)) === category);
+        const groupClients = activeClients().filter((client) => (client.category || inferCompanyCategory(client.name)) === category);
         if (!groupClients.length) return "";
         return `
           <div class="operation-group-title ${category}">
@@ -666,6 +707,10 @@ function renderClientForm() {
   $("#clientAreaInput").value = client.area || "";
   $("#clientPeriodInput").value = client.period || "";
   $("#clientSummaryInput").value = client.summary || "";
+  $("#clientStateBadge").textContent = client.isArchived ? "보관됨" : "진행중";
+  $("#clientStateBadge").className = `status-pill ${client.isArchived ? "review" : "done"}`;
+  $("#archiveClient").hidden = Boolean(client.isArchived);
+  $("#restoreClient").hidden = !client.isArchived;
 }
 
 function renderAiPanel() {
@@ -1109,6 +1154,42 @@ function saveClient() {
   showToast("업체 정보가 저장되었습니다.");
 }
 
+function archiveClient() {
+  const client = activeClient();
+  client.isArchived = true;
+  client.archivedAt = new Date().toISOString();
+  saveState();
+  renderAll();
+  showToast("업체를 보관했습니다. 보관 업체에서 다시 볼 수 있습니다.");
+}
+
+function restoreClient() {
+  const client = activeClient();
+  client.isArchived = false;
+  client.archivedAt = "";
+  saveState();
+  renderAll();
+  showToast("업체를 진행 업체로 되돌렸습니다.");
+}
+
+function deleteClient() {
+  const client = activeClient();
+  if (visibleClients().length <= 1) {
+    showToast("마지막 업체는 삭제할 수 없습니다.");
+    return;
+  }
+  const confirmed = window.confirm(`${client.name} 업체를 삭제할까요? 삭제하면 목록에서 숨겨지고 자동 복구되지 않습니다.`);
+  if (!confirmed) return;
+  client.isDeleted = true;
+  client.deletedAt = new Date().toISOString();
+  const fallback = activeClients().find((item) => item.id !== client.id) || archivedClients().find((item) => item.id !== client.id);
+  if (fallback) currentClientId = fallback.id;
+  currentContentIndex = 0;
+  saveState();
+  renderAll();
+  showToast("업체를 삭제했습니다.");
+}
+
 async function handleCaptureUpload(event) {
   const file = event.target.files?.[0];
   if (!file) return;
@@ -1254,6 +1335,9 @@ function bindEvents() {
   $("#saveOperationRows").addEventListener("click", saveOperationRows);
   $("#addPublication").addEventListener("click", addPublication);
   $("#saveClient").addEventListener("click", saveClient);
+  $("#archiveClient").addEventListener("click", archiveClient);
+  $("#restoreClient").addEventListener("click", restoreClient);
+  $("#deleteClient").addEventListener("click", deleteClient);
   $("#saveContent").addEventListener("click", saveCurrentContent);
   $("#captureInput").addEventListener("change", handleCaptureUpload);
   $("#copyBlogPrompt").addEventListener("click", () => copyChatGptPrompt("blog"));
