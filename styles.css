@@ -44,10 +44,15 @@ button {
 .sidebar {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
   height: 100vh;
+  min-height: 0;
   padding: 24px 18px;
+  overflow: hidden;
   background: #18242a;
   color: #f8fafc;
+  box-sizing: border-box;
 }
 
 .brand {
@@ -85,6 +90,27 @@ button {
   gap: 8px;
 }
 
+.client-list {
+  min-height: 0;
+  padding-right: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.client-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.client-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+}
+
+.client-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.26);
+  border-radius: 999px;
+}
+
 .nav-button,
 .client-card {
   width: 100%;
@@ -116,6 +142,10 @@ button {
 }
 
 .client-switcher {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
   margin-top: 30px;
 }
 
@@ -804,6 +834,17 @@ select:focus {
   .sidebar {
     position: static;
     height: auto;
+    overflow: visible;
+  }
+
+  .client-switcher {
+    flex: initial;
+    min-height: initial;
+  }
+
+  .client-list {
+    max-height: none;
+    overflow: visible;
   }
 
   .client-list {
