@@ -6,13 +6,46 @@ const notionLink =
   "https://candle-licorice-39c.notion.site/301c3667c16480cb9a3fce3a5d1169bc?v=301c3667c16481fe85b5000cd1a69667&source=copy_link";
 
 const sheetSeedCompanies = [
-  { name: "내곡해법수학", memo: "" },
-  { name: "더원수학 (테크노)", memo: "주2회 -> 주1회" },
-  { name: "라인아츠미술", memo: "" },
-  { name: "창원엘루미나erc", memo: "" },
-  { name: "대한민국입시학원", memo: "" },
-  { name: "데비스영어", memo: "" },
-  { name: "최강공부방(해법)", memo: "" },
+  { name: "해법수학영어학원", category: "academy", memo: "주2회" },
+  { name: "남쌤ERC", category: "academy", memo: "" },
+  { name: "드림리더스", category: "academy", memo: "" },
+  { name: "링키영어 월배점", category: "academy", memo: "" },
+  { name: "메타플러스수학학원", category: "academy", memo: "주1회" },
+  { name: "봄봄", category: "academy", memo: "" },
+  { name: "송도책통클럽", category: "academy", memo: "" },
+  { name: "송파위례 책통문해력센터", category: "academy", memo: "" },
+  { name: "아담리즈화정센터", category: "academy", memo: "주1회" },
+  { name: "영인창의수학", category: "academy", memo: "" },
+  { name: "오쌤수학", category: "academy", memo: "" },
+  { name: "원탑학원", category: "academy", memo: "" },
+  { name: "제주 BLI", category: "academy", memo: "" },
+  { name: "한울학원", category: "academy", memo: "" },
+  { name: "써니영어", category: "academy", memo: "자체발행" },
+  { name: "권지호영수클래스", category: "academy", memo: "" },
+  { name: "잉글리시아이 송화초점", category: "academy", memo: "" },
+  { name: "프라임보습학원", category: "academy", memo: "" },
+  { name: "켈리젤리", category: "academy", memo: "" },
+  { name: "메텔영어", category: "academy", memo: "주1회" },
+  { name: "이팩트영어학원", category: "academy", memo: "주1회 / 갱신" },
+  { name: "늘푸름과외방", category: "academy", memo: "주1회" },
+  { name: "아이비영어학원-인천", category: "academy", memo: "3개" },
+  { name: "다온아트.미술상자", category: "academy", memo: "5월부터 빡시게" },
+  { name: "티클래스 달서복지사", category: "academy", memo: "" },
+  { name: "해법수학 신하점", category: "academy", memo: "" },
+  { name: "외대HS어학원", category: "academy", memo: "주2회" },
+  { name: "엠베스트 se 몰입학원", category: "academy", memo: "" },
+  { name: "Core 어학원", category: "academy", memo: "" },
+  { name: "내곡해법수학", category: "academy", memo: "" },
+  { name: "더원수학 (테크노)", category: "academy", memo: "주2회 -> 주1회" },
+  { name: "라인아츠미술", category: "academy", memo: "" },
+  { name: "창원엘루미나erc", category: "academy", memo: "" },
+  { name: "대한민국입시학원", category: "academy", memo: "" },
+  { name: "데비스영어", category: "academy", memo: "" },
+  { name: "최강공부방(해법)", category: "academy", memo: "" },
+  { name: "두루 플레이스", category: "general", memo: "일반업종" },
+  { name: "수성렌트카 블로그", category: "general", memo: "일반업종" },
+  { name: "메디케어피트니스", category: "general", memo: "일반업종" },
+  { name: "육미향", category: "general", memo: "일반업종" },
 ];
 const seedClients = [
   {
@@ -120,6 +153,7 @@ function loadClients() {
 function normalizeClient(client) {
   return {
     ...client,
+    category: client.category || inferCompanyCategory(client.name),
     requests: client.requests || [],
     publishDates: normalizePublishDates(client.publishDates),
     account: normalizeAccount(client.account),
@@ -140,6 +174,18 @@ function normalizeClient(client) {
   };
 }
 
+function inferCompanyCategory(name = "") {
+  const generalNames = ["두루 플레이스", "수성렌트카 블로그", "메디케어피트니스", "육미향"];
+  return generalNames.includes(name) ? "general" : "academy";
+}
+
+function categoryLabel(category) {
+  return category === "general" ? "일반업종" : "학원업종";
+}
+
+function categoryDescription(category) {
+  return category === "general" ? "플레이스·블로그·매장 업종" : "학원·공부방·교육기관";
+}
 function normalizePublishDates(dates = []) {
   const normalized = Array.isArray(dates) ? dates.slice(0, 3) : [];
   while (normalized.length < 3) normalized.push("");
@@ -188,7 +234,8 @@ function makeSeedClient(company, index) {
   return {
     id: `sheet-client-${index}-${company.name.replace(/[^a-zA-Z0-9가-힣]/g, "-")}`,
     name: company.name,
-    area: "시트 등록 업체",
+    category: company.category || "academy",
+    area: company.category === "general" ? "일반업종" : "학원업종",
     owner: "원장님",
     period: "2026년 7월 2주차",
     summary: `${company.name}의 7월 2주차 발행 상태와 계정 정보를 관리합니다.`,
@@ -218,7 +265,13 @@ function mergeSheetClients(sourceClients) {
   const merged = Array.isArray(sourceClients) ? clone(sourceClients) : [];
   sheetSeedCompanies.forEach((company, index) => {
     const exists = merged.some((client) => client.name === company.name);
-    if (!exists) merged.push(makeSeedClient(company, index));
+    if (!exists) {
+      merged.push(makeSeedClient(company, index));
+    } else {
+      const matched = merged.find((client) => client.name === company.name);
+      if (matched && !matched.category) matched.category = company.category || "academy";
+      if (matched && (!matched.area || matched.area === "시트 등록 업체")) matched.area = company.category === "general" ? "일반업종" : "학원업종";
+    }
   });
   return merged;
 }
@@ -364,6 +417,39 @@ function renderAdmin() {
 
 function renderOperationsDashboard() {
   const statusOptions = ["미진행", "작성중", "예약완료", "발행완료", "수정요청", "확인필요"];
+  const groups = ["academy", "general"];
+  const renderClientRow = (client) => {
+    const operation = normalizeOperation(client.operation);
+    const account = normalizeAccount(client.account);
+    const isOpen = openAccountClientId === client.id;
+    const accountLabel = account.loginId || account.password ? "계정 보기" : "계정 입력";
+    return `
+      <article class="operations-row ${client.id === currentClientId ? "active" : ""}" data-client-id="${client.id}">
+        <button class="operation-client" type="button" data-select-client="${client.id}">
+          <strong>${escapeHtml(client.name)}</strong>
+          <small>${escapeHtml(client.area || categoryLabel(client.category))}</small>
+        </button>
+        <button class="account-toggle" type="button" data-account-client="${client.id}">${accountLabel}</button>
+        <select class="operation-status">
+          ${statusOptions.map((status) => `<option ${operation.status === status ? "selected" : ""}>${status}</option>`).join("")}
+        </select>
+        <input class="operation-date" type="text" value="${escapeHtml(operation.publishDate)}" placeholder="예: 2026-07-08" />
+        <input class="operation-url" type="url" value="${escapeHtml(operation.publishUrl)}" placeholder="https://..." />
+        <input class="operation-memo" type="text" value="${escapeHtml(operation.memo)}" placeholder="주2회 -> 주1회 등" />
+        <button class="secondary-button operation-save" type="button">저장</button>
+      </article>
+      ${isOpen ? `
+        <article class="account-panel" data-account-panel="${client.id}">
+          <label>아이디<input class="account-login" type="text" value="${escapeHtml(account.loginId)}" placeholder="관리자만 입력" /></label>
+          <label>비밀번호<input class="account-password" type="text" value="${escapeHtml(account.password)}" placeholder="관리자만 입력" /></label>
+          <label>접속 링크<input class="account-url" type="url" value="${escapeHtml(account.siteUrl)}" placeholder="https://..." /></label>
+          <label>계정 메모<input class="account-memo" type="text" value="${escapeHtml(account.memo)}" placeholder="주의사항" /></label>
+          <button class="primary-button account-save" type="button">계정 저장</button>
+        </article>
+      ` : ""}
+    `;
+  };
+
   $("#weekLabelInput").value = dashboardWeekLabel;
   $("#operationsDashboard").innerHTML = `
     <div class="operations-head">
@@ -375,36 +461,16 @@ function renderOperationsDashboard() {
       <span>메모</span>
       <span>선택</span>
     </div>
-    ${clients
-      .map((client) => {
-        const operation = normalizeOperation(client.operation);
-        const account = normalizeAccount(client.account);
-        const isOpen = openAccountClientId === client.id;
-        const accountLabel = account.loginId || account.password ? "계정 보기" : "계정 입력";
+    ${groups
+      .map((category) => {
+        const groupClients = clients.filter((client) => (client.category || inferCompanyCategory(client.name)) === category);
+        if (!groupClients.length) return "";
         return `
-          <article class="operations-row ${client.id === currentClientId ? "active" : ""}" data-client-id="${client.id}">
-            <button class="operation-client" type="button" data-select-client="${client.id}">
-              <strong>${escapeHtml(client.name)}</strong>
-              <small>${escapeHtml(client.area || "분야 미입력")}</small>
-            </button>
-            <button class="account-toggle" type="button" data-account-client="${client.id}">${accountLabel}</button>
-            <select class="operation-status">
-              ${statusOptions.map((status) => `<option ${operation.status === status ? "selected" : ""}>${status}</option>`).join("")}
-            </select>
-            <input class="operation-date" type="text" value="${escapeHtml(operation.publishDate)}" placeholder="예: 2026-07-08" />
-            <input class="operation-url" type="url" value="${escapeHtml(operation.publishUrl)}" placeholder="https://..." />
-            <input class="operation-memo" type="text" value="${escapeHtml(operation.memo)}" placeholder="주2회 -> 주1회 등" />
-            <button class="secondary-button operation-save" type="button">저장</button>
-          </article>
-          ${isOpen ? `
-            <article class="account-panel" data-account-panel="${client.id}">
-              <label>아이디<input class="account-login" type="text" value="${escapeHtml(account.loginId)}" placeholder="관리자만 입력" /></label>
-              <label>비밀번호<input class="account-password" type="text" value="${escapeHtml(account.password)}" placeholder="관리자만 입력" /></label>
-              <label>접속 링크<input class="account-url" type="url" value="${escapeHtml(account.siteUrl)}" placeholder="https://..." /></label>
-              <label>계정 메모<input class="account-memo" type="text" value="${escapeHtml(account.memo)}" placeholder="주의사항" /></label>
-              <button class="primary-button account-save" type="button">계정 저장</button>
-            </article>
-          ` : ""}
+          <div class="operation-group-title ${category}">
+            <span>${categoryLabel(category)}</span>
+            <small>${categoryDescription(category)} · ${groupClients.length}곳</small>
+          </div>
+          ${groupClients.map(renderClientRow).join("")}
         `;
       })
       .join("")}
@@ -437,7 +503,6 @@ function renderOperationsDashboard() {
     });
   });
 }
-
 function renderPublicationEditor(client) {
   const editor = $("#publicationEditor");
   if (!client.publications.length) {
@@ -768,12 +833,15 @@ function addClient() {
   clients.push({
     id,
     name: "새 업체",
-    area: "지역 · 과목",
+    category: "academy",
+    area: "학원업종",
     owner: "원장님",
     period: "운영 현황",
     summary: "업체의 마케팅 운영 방향을 입력하세요.",
     requests: [],
     publishDates: ["", "", ""],
+    account: { loginId: "", password: "", siteUrl: "", memo: "" },
+    operation: { status: "미진행", publishDate: "", publishUrl: "", memo: "" },
     publications: [],
     contents: [
       {
@@ -980,6 +1048,11 @@ function renderAll() {
 bindEvents();
 renderAll();
 applyHash();
+
+
+
+
+
 
 
 

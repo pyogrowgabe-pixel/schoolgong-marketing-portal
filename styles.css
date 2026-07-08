@@ -1142,3 +1142,37 @@ select:focus {
     margin-left: 0;
   }
 }
+
+.operation-group-title {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: #172126;
+  background: #edf7f5;
+  font-weight: 900;
+}
+
+.operation-group-title:first-of-type {
+  margin-top: 0;
+}
+
+.operation-group-title small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.operation-group-title.general {
+  background: #fff4dc;
+}
+
+@media (max-width: 720px) {
+  .operation-group-title {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
