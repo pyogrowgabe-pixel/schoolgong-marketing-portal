@@ -1,6 +1,6 @@
-﻿const STORAGE_KEY = "schoolgong-marketing-mvp-workflow-v2";
-const AI_CONFIG_KEY = "schoolgong-openai-proxy-v2";
+const STORAGE_KEY = "schoolgong-marketing-mvp-workflow-v2";
 const WEEK_LABEL_KEY = "schoolgong-dashboard-week-label-v1";
+const COMMUNITY_KEY = "schoolgong-director-community-v1";
 
 const notionLink =
   "https://candle-licorice-39c.notion.site/301c3667c16480cb9a3fce3a5d1169bc?v=301c3667c16481fe85b5000cd1a69667&source=copy_link";
@@ -113,6 +113,42 @@ const seedClients = [
   },
 ];
 
+const seedCommunityPosts = [
+  {
+    id: "share-1",
+    title: "초등 고학년 상담 전에 확인하는 질문 리스트",
+    category: "상담사례",
+    author: "김원장",
+    school: "해법수학영어학원",
+    body:
+      "첫 상담에서 아이의 학습 루틴, 숙제 반응, 오답 정리 습관을 빠르게 파악할 수 있도록 질문을 정리했습니다. 상담 전에 복사해서 쓰기 좋게 구성했어요.",
+    link: "",
+    pinned: true,
+    createdAt: "2026-07-08T00:10:00.000Z",
+    comments: [
+      {
+        id: "comment-1",
+        author: "OH 쌤",
+        body: "숙제 반응 질문을 먼저 꺼내면 학부모님도 편하게 말씀하시더라고요. 바로 적용해보겠습니다.",
+        createdAt: "2026-07-08T00:25:00.000Z",
+      },
+    ],
+  },
+  {
+    id: "share-2",
+    title: "수업 후 학부모 문자 예시",
+    category: "학부모소통",
+    author: "박원장",
+    school: "송도책통클럽",
+    body:
+      "수업 직후 아이가 오늘 해낸 부분과 다음 수업까지 챙길 부분을 짧게 보내는 문장 예시입니다. 길게 쓰기보다 관찰 포인트 하나를 남기는 방식이 반응이 좋았습니다.",
+    link: "",
+    pinned: false,
+    createdAt: "2026-07-07T08:30:00.000Z",
+    comments: [],
+  },
+];
+
 const statusOrder = [
   "키워드 선정",
   "글 작성중",
@@ -124,13 +160,14 @@ const statusOrder = [
 ];
 
 let clients = loadClients();
-let aiConfig = loadAiConfig();
+let communityPosts = loadCommunityPosts();
+let communitySearch = "";
+let communityCategory = "all";
 let dashboardWeekLabel = loadWeekLabel();
 let draggedClientId = null;
 let currentClientId = clients[0].id;
 let currentContentIndex = 0;
 let currentView = "admin";
-let lastAiMode = "body";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -279,20 +316,70 @@ function saveWeekLabel() {
   window.localStorage.setItem(WEEK_LABEL_KEY, dashboardWeekLabel);
 }
 
-function loadAiConfig() {
-  try {
-    return JSON.parse(window.localStorage.getItem(AI_CONFIG_KEY)) || { proxyUrl: "/api/openai-content" };
-  } catch {
-    return { proxyUrl: "/api/openai-content" };
-  }
-}
 
 function saveState() {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(clients));
 }
 
-function saveAiConfig() {
-  window.localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(aiConfig));
+
+function loadCommunityPosts() {
+  try {
+    const saved = window.localStorage.getItem(COMMUNITY_KEY);
+    return normalizeCommunityPosts(saved ? JSON.parse(saved) : clone(seedCommunityPosts));
+  } catch {
+    return normalizeCommunityPosts(clone(seedCommunityPosts));
+  }
+}
+
+function normalizeCommunityPosts(posts = []) {
+  return (Array.isArray(posts) ? posts : []).map((post, index) => ({
+    id: post.id || `share-${Date.now()}-${index}`,
+    title: post.title || "제목 없는 자료",
+    category: post.category || "수업자료",
+    author: post.author || "원장님",
+    school: post.school || "공유 학원",
+    body: post.body || "",
+    link: post.link || "",
+    pinned: Boolean(post.pinned),
+    createdAt: post.createdAt || new Date().toISOString(),
+    comments: normalizeCommunityComments(post.comments),
+  }));
+}
+
+function normalizeCommunityComments(comments = []) {
+  return (Array.isArray(comments) ? comments : []).map((comment, index) => ({
+    id: comment.id || `comment-${Date.now()}-${index}`,
+    author: comment.author || "원장님",
+    body: comment.body || "",
+    createdAt: comment.createdAt || new Date().toISOString(),
+  }));
+}
+
+function saveCommunityPosts() {
+  window.localStorage.setItem(COMMUNITY_KEY, JSON.stringify(communityPosts));
+}
+
+function formatDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "방금 전";
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function safeExternalUrl(value = "") {
+  const raw = String(value).trim();
+  if (!raw) return "";
+  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(raw) ? raw : `https://${raw}`;
+  try {
+    const url = new URL(candidate);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : "";
+  } catch {
+    return "";
+  }
 }
 
 function activeClient() {
@@ -582,7 +669,9 @@ function renderClientForm() {
 }
 
 function renderAiPanel() {
-  $("#aiProxyInput").value = aiConfig.proxyUrl || "";
+  const output = $("#aiOutput");
+  if (!output || output.value) return;
+  output.placeholder = "버튼을 누르면 ChatGPT에 붙여넣을 프롬프트가 여기에 만들어지고 복사됩니다. 완성본은 오른쪽 작성 작업실에 붙여넣어 관리하세요.";
 }
 
 function renderCapturePanel() {
@@ -632,10 +721,11 @@ function renderPortal() {
   const client = activeClient();
   const progress = progressFor(client);
 
-  $("#portalTitle").textContent = `${client.name} ${client.period || "마케팅 진행 현황"}`;
-  $("#portalSummary").textContent = `${client.owner}, ${client.area} 기준으로 키워드 선정, 글 작성, 이미지 제작, 발행 현황을 순차적으로 공유합니다.`;
+  $("#portalTitle").textContent = "원장님 자료 공유실";
+  $("#portalSummary").textContent = `${client.owner || "원장님"} 계정으로 자료를 올리고, 다른 원장님의 수업 사례와 운영 노하우에 댓글을 남길 수 있습니다.`;
   $("#portalProgress").textContent = `${progress}%`;
 
+  renderCommunity();
   renderPortalPublication(client);
 
   $("#portalContent").innerHTML = client.contents
@@ -658,6 +748,137 @@ function renderPortal() {
 
   renderPortalFeedback(client);
   $("#requestLog").innerHTML = client.requests.map((request) => `<p>${escapeHtml(request)}</p>`).join("");
+}
+
+function renderCommunity() {
+  const client = activeClient();
+  const authorInput = $("#shareAuthorInput");
+  const searchInput = $("#shareSearchInput");
+  const categoryFilter = $("#shareCategoryFilter");
+  const stats = $("#shareStats");
+  const list = $("#sharePostList");
+
+  if (!authorInput || !searchInput || !categoryFilter || !stats || !list) return;
+  if (!authorInput.value.trim()) authorInput.value = client.owner || "원장님";
+  searchInput.value = communitySearch;
+  categoryFilter.value = communityCategory;
+
+  const search = communitySearch.trim().toLowerCase();
+  const filteredPosts = communityPosts
+    .filter((post) => communityCategory === "all" || post.category === communityCategory)
+    .filter((post) => {
+      if (!search) return true;
+      return [post.title, post.body, post.author, post.school, post.category]
+        .join(" ")
+        .toLowerCase()
+        .includes(search);
+    })
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.createdAt) - new Date(a.createdAt));
+
+  const commentCount = communityPosts.reduce((sum, post) => sum + post.comments.length, 0);
+  stats.innerHTML = `<span>자료 ${communityPosts.length}</span><span>댓글 ${commentCount}</span>`;
+
+  if (!filteredPosts.length) {
+    list.innerHTML = `<p class="empty-note">조건에 맞는 자료가 없습니다. 검색어를 줄이거나 새 자료를 올려보세요.</p>`;
+    return;
+  }
+
+  list.innerHTML = filteredPosts
+    .map((post) => {
+      const link = safeExternalUrl(post.link);
+      const comments = post.comments.length
+        ? post.comments
+            .map(
+              (comment) => `
+                <div class="community-comment">
+                  <strong>${escapeHtml(comment.author)}</strong>
+                  <p>${escapeHtml(comment.body)}</p>
+                  <small>${escapeHtml(formatDateTime(comment.createdAt))}</small>
+                </div>
+              `
+            )
+            .join("")
+        : `<p class="empty-note compact">아직 댓글이 없습니다. 첫 의견을 남겨주세요.</p>`;
+
+      return `
+        <article class="share-post ${post.pinned ? "pinned" : ""}">
+          <div class="share-post-head">
+            <div>
+              <div class="share-meta">
+                <span class="category-chip">${escapeHtml(post.category)}</span>
+                ${post.pinned ? `<span class="category-chip pinned-chip">고정</span>` : ""}
+                <span>${escapeHtml(post.school)}</span>
+                <span>${escapeHtml(formatDateTime(post.createdAt))}</span>
+              </div>
+              <h3>${escapeHtml(post.title)}</h3>
+            </div>
+            <strong>${escapeHtml(post.author)}</strong>
+          </div>
+          <p class="share-body">${escapeHtml(post.body)}</p>
+          ${link ? `<a class="portal-link" href="${escapeHtml(link)}" target="_blank" rel="noreferrer">자료 링크 열기</a>` : ""}
+          <div class="community-comments">${comments}</div>
+          <div class="community-comment-form">
+            <textarea class="community-comment-input" rows="2" placeholder="댓글을 입력하세요."></textarea>
+            <button class="secondary-button save-community-comment" data-post-id="${escapeHtml(post.id)}" type="button">댓글 달기</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  list.querySelectorAll(".save-community-comment").forEach((button) => {
+    button.addEventListener("click", () => {
+      const post = communityPosts.find((item) => item.id === button.dataset.postId);
+      const form = button.closest(".community-comment-form");
+      const input = form?.querySelector(".community-comment-input");
+      const body = input?.value.trim() || "";
+      if (!post || !body) return;
+      post.comments.push({
+        id: `comment-${Date.now()}`,
+        author: authorInput.value.trim() || client.owner || "원장님",
+        body,
+        createdAt: new Date().toISOString(),
+      });
+      saveCommunityPosts();
+      renderCommunity();
+      showToast("댓글이 등록되었습니다.");
+    });
+  });
+}
+
+function addCommunityPost() {
+  const author = $("#shareAuthorInput").value.trim() || activeClient().owner || "원장님";
+  const title = $("#shareTitleInput").value.trim();
+  const category = $("#shareCategorySelect").value;
+  const body = $("#shareBodyInput").value.trim();
+  const link = safeExternalUrl($("#shareLinkInput").value.trim());
+
+  if (!title || !body) {
+    showToast("제목과 내용을 입력해주세요.");
+    return;
+  }
+
+  communityPosts.unshift({
+    id: `share-${Date.now()}`,
+    title,
+    category,
+    author,
+    school: activeClient().name || "공유 학원",
+    body,
+    link,
+    pinned: false,
+    createdAt: new Date().toISOString(),
+    comments: [],
+  });
+
+  $("#shareTitleInput").value = "";
+  $("#shareBodyInput").value = "";
+  $("#shareLinkInput").value = "";
+  communitySearch = "";
+  communityCategory = "all";
+  saveCommunityPosts();
+  renderCommunity();
+  showToast("자료가 공유 게시판에 올라갔습니다.");
 }
 
 function renderPortalFeedback(client) {
@@ -918,77 +1139,98 @@ function readFileAsDataUrl(file) {
   });
 }
 
-function buildBlogDraft(client, item, tone, goal) {
-  return `${item.title}\n\n${client.name} 콘텐츠 초안\n\n핵심 키워드: ${item.keyword}\n대상: ${client.area}\n톤: ${tone}\n\n1. 문제 제기\n학부모와 학생이 ${item.keyword}를 검색할 때 가장 궁금해하는 지점은 단순한 정보보다 실제 수업에서 어떤 변화가 만들어지는지입니다.\n\n2. 학교공 관점의 설명\n${item.body || "이 콘텐츠에서는 업체의 수업 방식, 상담 포인트, 차별화된 관리 흐름을 구체적으로 설명합니다."}\n\n3. 상담 전환 문단\n${client.name}은 원리 이해와 실전 적용 과정을 함께 점검하며, 학생의 현재 상태에 맞춰 다음 학습 단계를 제안합니다.\n\n4. 마무리\n자세한 상담은 현재 학습 상황을 먼저 확인한 뒤 방향을 잡는 것이 좋습니다.\n\n추가 요청 반영: ${goal || "없음"}`;
+function buildBlogPrompt(client, item, tone, goal, workType) {
+  return `너는 학원 전문 블로그 마케팅 카피라이터야. 아래 정보를 바탕으로 네이버 블로그에 올릴 포스팅 초안을 작성해줘.
+
+[업체 정보]
+- 업체명: ${client.name}
+- 업종/구분: ${client.area || categoryLabel(client.category)}
+- 작업 종류: ${workType}
+
+[콘텐츠 정보]
+- 핵심 키워드: ${item.keyword || client.name}
+- 글 제목: ${item.title || `${client.name} 콘텐츠`}
+- 발행 예정 시기: ${item.due || "미정"}
+- 기존 메모/본문 방향: ${item.body || "아직 없음"}
+- 톤: ${tone}
+- 추가 요청: ${goal || "없음"}
+
+[작성 요청]
+1. 학부모가 자연스럽게 읽을 수 있는 블로그 글로 작성해줘.
+2. 과장 광고처럼 보이지 않게, 신뢰감 있는 설명 중심으로 써줘.
+3. 제목 후보 5개, 본문 초안, 마지막 상담/문의 유도 문단을 나눠줘.
+4. 실제 확인되지 않은 정보는 단정하지 말고, 필요한 부분은 [확인 필요]라고 표시해줘.
+5. 문단은 모바일에서 읽기 좋게 짧게 끊어줘.`;
 }
 
 function buildThumbnailPrompt(client, item, tone, goal) {
-  return `썸네일 제작 프롬프트\n\n업체: ${client.name}\n키워드: ${item.keyword}\n제목: ${item.title}\n이미지 방향: ${item.image || "학습 자료, 수업 노트, 실전 문제 풀이 장면을 깔끔하게 구성"}\n톤: ${tone}\n구성: 상단에는 핵심 키워드가 바로 읽히고, 중앙에는 학습 자료와 상담/수업 분위기가 보이게 배치. 과한 장식보다 신뢰감 있는 교육 콘텐츠 느낌.\n피해야 할 것: 과도한 광고 느낌, 복잡한 배경, 알아보기 어려운 작은 글자.\n추가 요청: ${goal || "없음"}`;
+  return `너는 블로그 썸네일 기획자야. 아래 콘텐츠에 맞는 썸네일 문구와 이미지 방향을 제안해줘.
+
+[업체 정보]
+- 업체명: ${client.name}
+- 업종/구분: ${client.area || categoryLabel(client.category)}
+
+[콘텐츠 정보]
+- 핵심 키워드: ${item.keyword || client.name}
+- 글 제목: ${item.title || `${client.name} 콘텐츠`}
+- 현재 이미지 방향 메모: ${item.image || "아직 없음"}
+- 톤: ${tone}
+- 추가 요청: ${goal || "없음"}
+
+[기획 요청]
+1. 썸네일 메인 문구 10개를 제안해줘.
+2. 각 문구마다 어울리는 이미지 콘셉트를 한 줄로 설명해줘.
+3. 너무 광고처럼 보이는 표현은 피하고, 학부모가 신뢰할 수 있는 분위기로 잡아줘.
+4. 이미지 생성툴에 넣을 수 있는 프롬프트도 3개 만들어줘.
+5. 썸네일 안에 들어갈 글자는 짧고 크게 읽히게 구성해줘.`;
 }
 
-async function callOpenAiProxy(type) {
+function buildChatGptPrompt(type) {
   const client = activeClient();
   const item = activeContent();
   const tone = $("#aiToneSelect").value;
   const goal = $("#aiGoalInput").value.trim();
-  aiConfig.proxyUrl = $("#aiProxyInput").value.trim();
-  saveAiConfig();
+  const workType = $("#aiWorkTypeSelect").value;
+  return type === "thumbnail"
+    ? buildThumbnailPrompt(client, item, tone, goal)
+    : buildBlogPrompt(client, item, tone, goal, workType);
+}
 
-  if (!aiConfig.proxyUrl) {
-    lastAiMode = type === "blog" ? "body" : "image";
-    const localResult =
-      type === "blog" ? buildBlogDraft(client, item, tone, goal) : buildThumbnailPrompt(client, item, tone, goal);
-    $("#aiOutput").value = localResult;
-    showToast("로컬 초안을 생성했습니다.");
+function setPromptOutput(type) {
+  const prompt = buildChatGptPrompt(type);
+  $("#aiOutput").value = prompt;
+  return prompt;
+}
+
+async function writeClipboard(value) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
     return;
   }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
 
-  $("#aiOutput").value = "OpenAI 프록시로 요청 중입니다...";
+async function copyChatGptPrompt(type) {
+  const prompt = setPromptOutput(type);
   try {
-    const response = await fetch(aiConfig.proxyUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, client, content: item, tone, goal }),
-    });
-    if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}`;
-      try {
-        const errorData = await response.json();
-        if (errorData.error) errorMessage = errorData.error;
-      } catch {}
-      throw new Error(errorMessage);
-    }
-    const data = await response.json();
-    if (type === "blog") {
-      lastAiMode = "body";
-      $("#aiOutput").value = data.body || data.text || "응답에 본문이 없습니다.";
-      if (data.title) $("#titleInput").value = data.title;
-    } else {
-      lastAiMode = data.imageUrl ? "capture" : "image";
-      $("#aiOutput").value = data.thumbnailPrompt || data.prompt || data.imageUrl || "응답에 썸네일 결과가 없습니다.";
-      if (data.imageUrl) {
-        item.capture = { name: "OpenAI 썸네일", dataUrl: data.imageUrl, uploadedAt: new Date().toISOString() };
-        item.status = "검수 대기";
-        saveState();
-        renderAll();
-      }
-    }
-    showToast("OpenAI 생성 결과를 받았습니다.");
-  } catch (error) {
-    $("#aiOutput").value = `연동 오류: ${error.message}\n\n프록시 API URL이 맞는지 확인해주세요. 브라우저에 OpenAI API 키를 직접 넣지 않는 구조를 권장합니다.`;
-    showToast("OpenAI 연동 요청이 실패했습니다.");
+    await writeClipboard(prompt);
+    showToast(type === "thumbnail" ? "썸네일 프롬프트를 복사했습니다." : "블로그 프롬프트를 복사했습니다.");
+  } catch {
+    showToast("프롬프트가 아래 칸에 만들어졌습니다. 직접 복사해주세요.");
   }
 }
 
-function applyAiOutput() {
-  const value = $("#aiOutput").value.trim();
-  if (!value) return;
-  if (lastAiMode === "image") {
-    $("#imageInput").value = value;
-  } else {
-    $("#bodyInput").value = value;
-  }
-  saveCurrentContent();
+async function openChatGpt(type) {
+  await copyChatGptPrompt(type);
+  window.open("https://chatgpt.com/", "_blank", "noopener");
 }
 
 function switchView(view) {
@@ -1014,9 +1256,19 @@ function bindEvents() {
   $("#saveClient").addEventListener("click", saveClient);
   $("#saveContent").addEventListener("click", saveCurrentContent);
   $("#captureInput").addEventListener("change", handleCaptureUpload);
-  $("#generateBlog").addEventListener("click", () => callOpenAiProxy("blog"));
-  $("#generateThumb").addEventListener("click", () => callOpenAiProxy("thumbnail"));
-  $("#applyAiOutput").addEventListener("click", applyAiOutput);
+  $("#copyBlogPrompt").addEventListener("click", () => copyChatGptPrompt("blog"));
+  $("#openBlogChat").addEventListener("click", () => openChatGpt("blog"));
+  $("#copyThumbPrompt").addEventListener("click", () => copyChatGptPrompt("thumbnail"));
+  $("#openThumbChat").addEventListener("click", () => openChatGpt("thumbnail"));
+  $("#addSharePost").addEventListener("click", addCommunityPost);
+  $("#shareSearchInput").addEventListener("input", (event) => {
+    communitySearch = event.target.value;
+    renderCommunity();
+  });
+  $("#shareCategoryFilter").addEventListener("change", (event) => {
+    communityCategory = event.target.value;
+    renderCommunity();
+  });
 
   $("#copyShareLink").addEventListener("click", async () => {
     const shareUrl = `${window.location.href.split("#")[0]}#client-${activeClient().id}`;
@@ -1059,24 +1311,3 @@ function renderAll() {
 bindEvents();
 renderAll();
 applyHash();
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
@@ -191,22 +191,23 @@
             <section class="panel ai-panel">
               <div class="panel-header">
                 <div>
-                  <p class="section-label">OpenAI 제작실</p>
-                  <h2>블로그 글쓰기 · 썸네일</h2>
+                  <p class="section-label">ChatGPT 작업실</p>
+                  <h2>프롬프트 복사 · 작업 링크</h2>
                 </div>
-                <span class="status-pill">API 준비</span>
+                <span class="status-pill done">API 비용 없음</span>
               </div>
               <div class="form-grid two-cols">
-                <label>프록시 API URL<input id="aiProxyInput" type="url" placeholder="예: /api/openai-content" /></label>
+                <label>작업 종류<select id="aiWorkTypeSelect"><option>블로그 포스팅</option><option>썸네일 기획</option><option>문구 수정</option></select></label>
                 <label>톤<select id="aiToneSelect"><option>전문적이고 신뢰감 있게</option><option>학부모가 이해하기 쉽게</option><option>상담 전환 중심으로</option></select></label>
               </div>
               <label class="wide-label">추가 요청<textarea id="aiGoalInput" rows="3" placeholder="예: 원리 중심 수업의 차별점을 강조해줘"></textarea></label>
               <div class="button-row">
-                <button id="generateBlog" class="primary-button" type="button">블로그 초안 생성</button>
-                <button id="generateThumb" class="secondary-button" type="button">썸네일 기획 생성</button>
-                <button id="applyAiOutput" class="secondary-button" type="button">결과를 본문에 적용</button>
+                <button id="copyBlogPrompt" class="primary-button" type="button">블로그 프롬프트 복사</button>
+                <button id="openBlogChat" class="secondary-button" type="button">ChatGPT에서 글쓰기</button>
+                <button id="copyThumbPrompt" class="secondary-button" type="button">썸네일 프롬프트 복사</button>
+                <button id="openThumbChat" class="secondary-button" type="button">ChatGPT에서 이미지 기획</button>
               </div>
-              <textarea id="aiOutput" class="ai-output" rows="9" placeholder="생성 결과가 여기에 표시됩니다. 프록시 API URL이 없으면 운영용 초안/프롬프트를 로컬에서 만듭니다."></textarea>
+              <textarea id="aiOutput" class="ai-output" rows="9" placeholder="버튼을 누르면 ChatGPT에 붙여넣을 프롬프트가 여기에 만들어지고 복사됩니다. 완성된 글이나 썸네일 문구는 오른쪽 작성 작업실에 붙여넣어 관리하세요."></textarea>
             </section>
 
             <section class="panel capture-panel">
@@ -231,14 +232,56 @@
           <div class="client-portal">
             <section class="portal-hero">
               <div>
-                <p class="eyebrow">원장님 전용 검수 화면</p>
-                <h2 id="portalTitle">마케팅 진행 현황</h2>
+                <p class="eyebrow">원장님 공유 허브</p>
+                <h2 id="portalTitle">수업 자료와 운영 노하우</h2>
                 <p id="portalSummary"></p>
               </div>
               <div class="portal-score">
                 <span>진행률</span>
                 <strong id="portalProgress">0%</strong>
               </div>
+            </section>
+
+            <section class="portal-section share-board">
+              <div class="panel-header">
+                <div>
+                  <p class="section-label">자료 공유</p>
+                  <h2>원장님들이 직접 올리는 게시판</h2>
+                </div>
+                <div id="shareStats" class="share-stats"></div>
+              </div>
+
+              <div class="share-composer">
+                <div class="form-grid two-cols">
+                  <label>작성자<input id="shareAuthorInput" type="text" placeholder="예: 김원장" /></label>
+                  <label>자료 구분<select id="shareCategorySelect">
+                    <option>수업자료</option>
+                    <option>상담사례</option>
+                    <option>학부모소통</option>
+                    <option>운영노하우</option>
+                    <option>질문</option>
+                  </select></label>
+                </div>
+                <label>제목<input id="shareTitleInput" type="text" placeholder="예: 중등 첫 상담 때 쓰는 질문 리스트" /></label>
+                <label>내용<textarea id="shareBodyInput" rows="4" placeholder="자료 설명, 적용한 수업 상황, 함께 논의하고 싶은 점을 남겨주세요."></textarea></label>
+                <div class="share-composer-bottom">
+                  <label>링크<input id="shareLinkInput" type="url" placeholder="구글드라이브, 노션, 블로그 링크" /></label>
+                  <button id="addSharePost" class="primary-button" type="button">자료 올리기</button>
+                </div>
+              </div>
+
+              <div class="share-toolbar">
+                <input id="shareSearchInput" type="search" placeholder="제목, 내용, 작성자로 검색" />
+                <select id="shareCategoryFilter" aria-label="자료 구분 필터">
+                  <option value="all">전체 자료</option>
+                  <option>수업자료</option>
+                  <option>상담사례</option>
+                  <option>학부모소통</option>
+                  <option>운영노하우</option>
+                  <option>질문</option>
+                </select>
+              </div>
+              <div id="sharePostList" class="share-post-list"></div>
             </section>
 
             <section class="portal-section">
@@ -289,5 +332,3 @@
     <script src="./app.js"></script>
   </body>
 </html>
-
-
