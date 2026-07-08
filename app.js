@@ -128,6 +128,7 @@ let clients = loadClients();
 let aiConfig = loadAiConfig();
 let dashboardWeekLabel = loadWeekLabel();
 let openAccountClientId = null;
+let draggedClientId = null;
 let currentClientId = clients[0].id;
 let currentContentIndex = 0;
 let currentView = "admin";
@@ -425,6 +426,7 @@ function renderOperationsDashboard() {
     const accountLabel = account.loginId || account.password ? "계정 보기" : "계정 입력";
     return `
       <article class="operations-row ${client.id === currentClientId ? "active" : ""}" data-client-id="${client.id}">
+        <button class="drag-handle" type="button" draggable="true" data-drag-client="${client.id}" title="순서 이동" aria-label="업체 순서 이동">☰</button>
         <button class="operation-client" type="button" data-select-client="${client.id}">
           <strong>${escapeHtml(client.name)}</strong>
           <small>${escapeHtml(client.area || categoryLabel(client.category))}</small>
@@ -453,6 +455,7 @@ function renderOperationsDashboard() {
   $("#weekLabelInput").value = dashboardWeekLabel;
   $("#operationsDashboard").innerHTML = `
     <div class="operations-head">
+      <span></span>
       <span>업체명</span>
       <span>계정</span>
       <span>상태</span>
@@ -476,6 +479,7 @@ function renderOperationsDashboard() {
       .join("")}
   `;
 
+  bindOperationDragEvents();
   $("#operationsDashboard").querySelectorAll("[data-select-client]").forEach((button) => {
     button.addEventListener("click", () => {
       currentClientId = button.dataset.selectClient;
@@ -502,6 +506,65 @@ function renderOperationsDashboard() {
       saveAccountPanel(button.closest(".account-panel"));
     });
   });
+}
+function bindOperationDragEvents() {
+  const dashboard = $("#operationsDashboard");
+
+  dashboard.querySelectorAll(".drag-handle").forEach((handle) => {
+    handle.addEventListener("dragstart", (event) => {
+      draggedClientId = handle.dataset.dragClient;
+      const row = handle.closest(".operations-row");
+      row?.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", draggedClientId);
+    });
+
+    handle.addEventListener("dragend", () => {
+      draggedClientId = null;
+      dashboard.querySelectorAll(".operations-row").forEach((row) => row.classList.remove("dragging", "drag-over"));
+    });
+  });
+
+  dashboard.querySelectorAll(".operations-row").forEach((row) => {
+    row.addEventListener("dragover", (event) => {
+      if (!draggedClientId || draggedClientId === row.dataset.clientId) return;
+      event.preventDefault();
+      row.classList.add("drag-over");
+    });
+
+    row.addEventListener("dragleave", () => row.classList.remove("drag-over"));
+
+    row.addEventListener("drop", (event) => {
+      event.preventDefault();
+      row.classList.remove("drag-over");
+      reorderClientRows(draggedClientId || event.dataTransfer.getData("text/plain"), row.dataset.clientId);
+    });
+  });
+}
+
+function reorderClientRows(sourceId, targetId) {
+  if (!sourceId || !targetId || sourceId === targetId) return;
+  const sourceIndex = clients.findIndex((client) => client.id === sourceId);
+  const targetIndex = clients.findIndex((client) => client.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return;
+
+  const source = clients[sourceIndex];
+  const target = clients[targetIndex];
+  const sourceCategory = source.category || inferCompanyCategory(source.name);
+  const targetCategory = target.category || inferCompanyCategory(target.name);
+  if (sourceCategory !== targetCategory) {
+    showToast("같은 업종 안에서만 순서를 바꿀 수 있습니다.");
+    renderAll();
+    return;
+  }
+
+  clients.splice(sourceIndex, 1);
+  const adjustedTargetIndex = clients.findIndex((client) => client.id === targetId);
+  clients.splice(adjustedTargetIndex, 0, source);
+  currentClientId = source.id;
+  saveState();
+  renderAll();
+  showToast("업체 순서를 변경했습니다.");
 }
 function renderPublicationEditor(client) {
   const editor = $("#publicationEditor");
@@ -1048,6 +1111,7 @@ function renderAll() {
 bindEvents();
 renderAll();
 applyHash();
+
 
 
 
