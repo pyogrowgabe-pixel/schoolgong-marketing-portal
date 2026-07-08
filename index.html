@@ -98,18 +98,39 @@
             </div>
           </section>
 
-          <div class="content-layout">
-            <section class="panel">
+          <div class="admin-tools-grid">
+            <section class="panel company-panel">
               <div class="panel-header">
                 <div>
-                  <p class="section-label">키워드 관리</p>
-                  <h2>콘텐츠 제작 현황</h2>
+                  <p class="section-label">업체 관리</p>
+                  <h2>업체 정보</h2>
                 </div>
-                <button id="addKeyword" class="secondary-button" type="button">새 키워드</button>
+                <div class="client-actions">
+                  <span id="clientStateBadge" class="status-pill done">진행중</span>
+                  <button id="saveClient" class="secondary-button" type="button">업체 저장</button>
+                  <button id="archiveClient" class="secondary-button" type="button">보관(대행마감)</button>
+                  <button id="restoreClient" class="secondary-button" type="button">진행 재개</button>
+                  <button id="deleteClient" class="text-danger" type="button">삭제</button>
+                </div>
               </div>
-              <div id="pipeline" class="pipeline"></div>
+              <div class="form-grid two-cols">
+                <label>업체명<input id="clientNameInput" type="text" /></label>
+                <label>원장님명<input id="clientOwnerInput" type="text" /></label>
+                <label>분야/지역<input id="clientAreaInput" type="text" /></label>
+                <label>운영 기간<input id="clientPeriodInput" type="text" /></label>
+              </div>
+              <label class="wide-label">운영 요약<textarea id="clientSummaryInput" rows="4"></textarea></label>
+              <div class="client-work-section">
+                <div class="client-work-head">
+                  <div>
+                    <p class="section-label">작업물</p>
+                    <h3>그동안의 작업물</h3>
+                  </div>
+                  <button id="addKeyword" class="secondary-button" type="button">작업물 추가</button>
+                </div>
+                <div id="clientWorkList" class="client-work-list"></div>
+              </div>
             </section>
-
             <section class="panel editor-panel">
               <div class="panel-header">
                 <div>
@@ -154,35 +175,9 @@
                   <option>발행 완료</option>
                   <option>수정 요청</option>
                 </select>
-                <button id="saveContent" class="primary-button" type="button">저장</button>
+                <button id="saveContent" class="primary-button" type="button">작업물 저장</button>
               </div>
             </section>
-          </div>
-
-          <div class="admin-tools-grid">
-            <section class="panel company-panel">
-              <div class="panel-header">
-                <div>
-                  <p class="section-label">업체 관리</p>
-                  <h2>업체 정보</h2>
-                </div>
-                <div class="client-actions">
-                  <span id="clientStateBadge" class="status-pill done">진행중</span>
-                  <button id="saveClient" class="secondary-button" type="button">업체 저장</button>
-                  <button id="archiveClient" class="secondary-button" type="button">보관(대행마감)</button>
-                  <button id="restoreClient" class="secondary-button" type="button">진행 재개</button>
-                  <button id="deleteClient" class="text-danger" type="button">삭제</button>
-                </div>
-              </div>
-              <div class="form-grid two-cols">
-                <label>업체명<input id="clientNameInput" type="text" /></label>
-                <label>원장님명<input id="clientOwnerInput" type="text" /></label>
-                <label>분야/지역<input id="clientAreaInput" type="text" /></label>
-                <label>운영 기간<input id="clientPeriodInput" type="text" /></label>
-              </div>
-              <label class="wide-label">운영 요약<textarea id="clientSummaryInput" rows="4"></textarea></label>
-            </section>
-
             <section class="panel publication-panel">
               <div class="panel-header">
                 <div>

@@ -485,7 +485,10 @@ function renderClients() {
     button.addEventListener("click", () => {
       currentClientId = button.dataset.client;
       currentContentIndex = 0;
-      renderAll();
+      switchView("admin");
+      window.setTimeout(() => {
+        document.querySelector(".company-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
     });
   });
 }
@@ -505,27 +508,7 @@ function renderAdmin() {
     currentView === "admin" ? "콘텐츠 대행 대시보드" : `${client.name} 공유 현황`;
 
   renderOperationsDashboard();
-
-  $("#pipeline").innerHTML = client.contents
-    .map(
-      (item, index) => `
-        <button class="content-card ${index === currentContentIndex ? "active" : ""}" data-index="${index}" type="button">
-          <div>
-            <h3>${escapeHtml(item.keyword)}</h3>
-            <p>${escapeHtml(item.title)}</p>
-          </div>
-          <span class="status-pill ${statusClass(item.status)}">${escapeHtml(item.status)}</span>
-        </button>
-      `
-    )
-    .join("");
-
-  $("#pipeline").querySelectorAll(".content-card").forEach((button) => {
-    button.addEventListener("click", () => {
-      currentContentIndex = Number(button.dataset.index);
-      renderAll();
-    });
-  });
+  renderClientWorkList(client);
 
   renderEditor();
   renderClientForm();
@@ -686,6 +669,41 @@ function renderPublicationEditor(client) {
   });
 }
 
+function renderClientWorkList(client) {
+  const list = $("#clientWorkList");
+  if (!list) return;
+
+  if (!client.contents.length) {
+    list.innerHTML = `<p class="empty-note">아직 등록된 작업물이 없습니다.</p>`;
+    return;
+  }
+
+  list.innerHTML = client.contents
+    .map((item, index) => {
+      const link = safeExternalUrl(item.url);
+      return `
+        <button class="client-work-card ${index === currentContentIndex ? "active" : ""}" data-work-index="${index}" type="button">
+          <div>
+            <strong>${escapeHtml(item.title || item.keyword)}</strong>
+            <span>${escapeHtml(item.keyword || "키워드 미입력")}</span>
+            <small>${escapeHtml(item.due || "일정 미정")}${link ? " · 발행 링크 있음" : ""}</small>
+          </div>
+          <span class="status-pill ${statusClass(item.status)}">${escapeHtml(item.status || "상태 없음")}</span>
+        </button>
+      `;
+    })
+    .join("");
+
+  list.querySelectorAll(".client-work-card").forEach((button) => {
+    button.addEventListener("click", () => {
+      currentContentIndex = Number(button.dataset.workIndex);
+      renderAll();
+      window.setTimeout(() => {
+        document.querySelector(".editor-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+    });
+  });
+}
 function renderEditor() {
   const item = activeContent();
   $("#editorTitle").textContent = item.title;
