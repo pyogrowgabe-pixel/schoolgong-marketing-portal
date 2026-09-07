@@ -1,4 +1,4 @@
-﻿const DEFAULT_TEXT_MODEL = "gpt-4.1-mini";
+const DEFAULT_TEXT_MODEL = "gpt-4.1-mini";
 const DEFAULT_IMAGE_MODEL = "gpt-image-1";
 
 function json(res, status, body) {
@@ -143,17 +143,26 @@ export default async function handler(req, res) {
   if (req.method === "OPTIONS") return json(res, 204, {});
   if (req.method !== "POST") return json(res, 405, { error: "POST 요청만 지원합니다." });
 
-  if (!process.env.OPENAI_API_KEY) {
-    return json(res, 500, {
-      error: "Vercel 환경변수 OPENAI_API_KEY가 설정되어 있지 않습니다.",
-    });
-  }
-
   try {
-    const payload = req.body || {};
+    const payload = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
+
+    if (payload.type === "status") {
+      return json(res, 200, {
+        configured: Boolean(process.env.OPENAI_API_KEY),
+        textModel: process.env.OPENAI_TEXT_MODEL || DEFAULT_TEXT_MODEL,
+        imageModel: process.env.OPENAI_IMAGE_MODEL || DEFAULT_IMAGE_MODEL,
+      });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return json(res, 500, {
+        error: "Vercel 환경변수 OPENAI_API_KEY가 설정되어 있지 않습니다.",
+      });
+    }
+
     if (payload.type === "blog") return json(res, 200, await generateBlog(payload));
     if (payload.type === "thumbnail") return json(res, 200, await generateThumbnail(payload));
-    return json(res, 400, { error: "지원하지 않는 type입니다. blog 또는 thumbnail을 사용하세요." });
+    return json(res, 400, { error: "지원하지 않는 type입니다. status, blog, thumbnail 중 하나를 사용하세요." });
   } catch (error) {
     return json(res, 500, { error: error.message || "OpenAI API 요청 중 오류가 발생했습니다." });
   }

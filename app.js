@@ -734,7 +734,7 @@ function renderClientForm() {
 function renderAiPanel() {
   const output = $("#aiOutput");
   if (!output || output.value) return;
-  output.placeholder = "버튼을 누르면 ChatGPT에 붙여넣을 프롬프트가 여기에 만들어지고 복사됩니다. 완성본은 오른쪽 작성 작업실에 붙여넣어 관리하세요.";
+  output.placeholder = "API 생성 결과 또는 ChatGPT에 붙여넣을 프롬프트가 여기에 표시됩니다. OpenAI 키는 Vercel 환경변수 OPENAI_API_KEY에만 저장하세요.";
 }
 
 function renderCapturePanel() {
@@ -1330,6 +1330,104 @@ async function copyChatGptPrompt(type) {
 async function openChatGpt(type) {
   await copyChatGptPrompt(type);
   window.open("https://chatgpt.com/", "_blank", "noopener");
+}
+function buildApiPayload(type) {
+  return {
+    type,
+    client: activeClient(),
+    content: activeContent(),
+    tone: $("#aiToneSelect").value,
+    goal: $("#aiGoalInput").value.trim(),
+    workType: $("#aiWorkTypeSelect").value,
+  };
+}
+
+function setAiButtonsBusy(isBusy) {
+  ["#checkApiConnection", "#generateBlogApi", "#generateThumbApi"].forEach((selector) => {
+    const button = $(selector);
+    if (button) button.disabled = isBusy;
+  });
+}
+
+async function requestOpenAiContent(type) {
+  const response = await fetch("/api/openai-content", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(buildApiPayload(type)),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `API 요청 실패: ${response.status}`);
+  return data;
+}
+
+async function checkApiConnection() {
+  setAiButtonsBusy(true);
+  $("#aiOutput").value = "API 연결을 확인하는 중입니다...";
+  try {
+    const data = await requestOpenAiContent("status");
+    const textModel = data.textModel || "기본 텍스트 모델";
+    const imageModel = data.imageModel || "기본 이미지 모델";
+    $("#aiOutput").value = data.configured
+      ? `API 연결 완료\n\n텍스트 모델: ${textModel}\n이미지 모델: ${imageModel}\n\n이제 API로 블로그 생성 또는 썸네일 이미지 생성을 사용할 수 있습니다.`
+      : "API 키가 아직 연결되지 않았습니다. Vercel 환경변수에 OPENAI_API_KEY를 추가한 뒤 다시 배포해주세요.";
+    showToast(data.configured ? "API 연결을 확인했습니다." : "API 키 설정이 필요합니다.");
+  } catch (error) {
+    $("#aiOutput").value = `API 연결 확인 실패: ${error.message}\n\nVercel 환경변수 OPENAI_API_KEY가 들어가 있는지 확인해주세요.`;
+    showToast("API 연결 확인에 실패했습니다.");
+  } finally {
+    setAiButtonsBusy(false);
+  }
+}
+
+async function generateContentWithApi(type) {
+  setAiButtonsBusy(true);
+  $("#aiOutput").value = type === "thumbnail" ? "API로 썸네일 이미지를 생성하는 중입니다..." : "API로 블로그 글을 생성하는 중입니다...";
+  try {
+    const data = await requestOpenAiContent(type);
+    const item = activeContent();
+
+    if (type === "blog") {
+      const body = data.body || data.text || "";
+      $("#aiOutput").value = body || "응답에 본문이 없습니다.";
+      if (body) {
+        item.body = body;
+        $("#bodyInput").value = body;
+      }
+      if (data.title) {
+        item.title = data.title;
+        $("#titleInput").value = data.title;
+      }
+      item.status = "글 작성중";
+      saveState();
+      renderAll();
+      showToast("블로그 글을 생성해 작업물에 반영했습니다.");
+      return;
+    }
+
+    const prompt = data.thumbnailPrompt || data.prompt || "";
+    const imageUrl = data.imageUrl || "";
+    $("#aiOutput").value = imageUrl
+      ? `${prompt}\n\n썸네일 이미지가 캡처본 검수 영역에 등록되었습니다.`
+      : prompt || "응답에 썸네일 결과가 없습니다.";
+    if (prompt) {
+      item.image = prompt;
+      $("#imageInput").value = prompt;
+    }
+    if (imageUrl) {
+      item.capture = { name: "AI 썸네일", dataUrl: imageUrl, uploadedAt: new Date().toISOString() };
+      item.status = "검수 대기";
+    } else {
+      item.status = "이미지 제작중";
+    }
+    saveState();
+    renderAll();
+    showToast(imageUrl ? "썸네일 이미지를 생성해 등록했습니다." : "썸네일 기획을 생성했습니다.");
+  } catch (error) {
+    $("#aiOutput").value = `API 생성 실패: ${error.message}\n\n키가 없거나 결제/크레딧/모델 설정 문제가 있을 수 있습니다. 비용 없는 방식이 필요하면 아래 프롬프트 복사 버튼을 사용하세요.`;
+    showToast("API 생성에 실패했습니다.");
+  } finally {
+    setAiButtonsBusy(false);
+  }
 }
 
 function switchView(view) {
